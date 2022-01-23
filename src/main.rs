@@ -3,6 +3,17 @@
 
 use arduino_hal::port::{mode, Pin};
 use panic_halt as _;
+use core::ops::Range;
+
+
+fn blink_for_range(range : Range<u16>, leds : &mut[Pin<mode::Output>]) {
+    range.map(|i| i * 100).for_each(|ms| {
+        leds.iter_mut().for_each(|led| {
+            led.toggle();
+            arduino_hal::delay_ms(ms as u16);
+        })
+    });
+}
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -17,17 +28,7 @@ fn main() -> ! {
     ];
 
     loop {
-        (0..10).map(|i| i * 100).for_each(|ms| {
-            leds.iter_mut().for_each(|led| {
-                led.toggle();
-                arduino_hal::delay_ms(ms as u16);
-            })
-        });
-        (10..0).map(|i| i * 100).for_each(|ms| {
-            leds.iter_mut().for_each(|led| {
-                led.toggle();
-                arduino_hal::delay_ms(ms as u16);
-            })
-        });
+        blink_for_range(0..10, &mut leds);
+        blink_for_range(10..0, &mut leds);
     }
 }
