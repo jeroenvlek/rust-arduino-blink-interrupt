@@ -8,18 +8,16 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use arduino_hal::port::{mode, Pin};
 use either::*;
 
-static REVERSE: AtomicBool = AtomicBool::new(false);
+static REVERSED: AtomicBool = AtomicBool::new(false);
 
 fn is_reversed() -> bool {
-    return avr_device::interrupt::free(|_| { REVERSE.load(Ordering::SeqCst) });
+    return avr_device::interrupt::free(|_| { REVERSED.load(Ordering::SeqCst) });
 }
 
 #[avr_device::interrupt(atmega328p)]
 fn INT0() {
-    avr_device::interrupt::free(|_| {
-        let current = REVERSE.load(Ordering::SeqCst);
-        REVERSE.store(!current, Ordering::SeqCst);
-    });
+    let current = REVERSED.load(Ordering::SeqCst);
+    REVERSED.store(!current, Ordering::SeqCst);
 }
 
 fn blink_for_range(range : Range<u16>, leds : &mut[Pin<mode::Output>]) {
@@ -41,7 +39,11 @@ fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
 
-    pins.d2.into_pull_up_input(); // is this necessary?
+    // thanks to tsemczyszyn and Rahix: https://github.com/Rahix/avr-hal/issues/240
+    // Configure INT0 for falling edge. 0x03 would be rising edge.
+    dp.EXINT.eicra.modify(|_, w| w.isc0().bits(0x02));
+    // Enable the INT0 interrupt source.
+    dp.EXINT.eimsk.modify(|_, w| w.int0().set_bit());
 
     let mut leds: [Pin<mode::Output>; 4] = [
         pins.d3.into_output().downgrade(),
